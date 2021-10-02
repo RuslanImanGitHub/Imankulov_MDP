@@ -6,7 +6,7 @@ import PySimpleGUI as sg
 rastr = win32com.client.Dispatch('Astra.Rastr')
 
 
-def trajectory_loading(trajectory_file, trajectory_shabl):
+def trajectory_loading(trajectory_file, trajectory_shabl) -> None:
     """
     считывает файл траектории из формата .csv
     преобразовывает его к виду, в котором
@@ -58,7 +58,7 @@ def trajectory_loading(trajectory_file, trajectory_shabl):
     rastr.Save('Trajectory.ut2', trajectory_shabl)
 
 
-def flowgate_loading(flowgate_file, flowgate_shabl):
+def flowgate_loading(flowgate_file, flowgate_shabl) -> None:
     """
     считывает файл с сечением из формата .json
     с использованием pandas.dataframe
@@ -87,7 +87,7 @@ def flowgate_loading(flowgate_file, flowgate_shabl):
     rastr.Save('Flowgate.sch', flowgate_shabl)
 
 
-def faults_loading(faults_file):
+def faults_loading(faults_file) -> pandas.Dataframe:
     """
     считывает файл с авариями в формате .json
     и загружает их в pandas.dataframe
@@ -99,7 +99,7 @@ def faults_loading(faults_file):
     return fault
 
 
-def loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl):
+def loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl) -> None:
     """
     загружает файлы режима, траектории и сечения
     и увеличивает предельное число шагов утяжеления до 200
@@ -114,7 +114,7 @@ def loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl):
     rastr.Tables('ut_common').Cols('iter').SetZ(0, 200)
 
 
-def ut():
+def ut() -> None:
     """
     выполняет инициализацию утяжеления и
     в случае успеха утяжеляет режим до предела
@@ -123,7 +123,7 @@ def ut():
         rastr.ut_utr('')
 
 
-def ut_control(V, I, P):
+def ut_control(V, I, P) -> None:
     """
     включает контроль параметров для утяжеления и
     позволяет ввыбрать какие параметры контролировать для утяжеления
@@ -144,7 +144,7 @@ def criteria1(
         reg_shab,
         position_of_flowgate,
         trajectory_shabl,
-        flowgate_shabl):
+        flowgate_shabl) -> pandas.Dataframe:
     """
     осуществляет расчет МДП по первому критерию
     :param reg: путь к файлу режима
@@ -173,7 +173,7 @@ def criteria2(
         position_of_flowgate,
         result_data,
         trajectory_shabl,
-        flowgate_shabl):
+        flowgate_shabl) -> pandas.Dataframe:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -206,7 +206,7 @@ def criteria3(
         result_data,
         trajectory_shabl,
         flowgate_shabl,
-        faults):
+        faults) -> pandas.Dataframe:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -266,7 +266,7 @@ def criteria4(
         result_data,
         trajectory_shabl,
         flowgate_shabl,
-        faults):
+        faults) -> pandas.Dataframe:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -324,7 +324,7 @@ def criteria5(
         position_of_flowgate,
         result_data,
         trajectory_shabl,
-        flowgate_shabl):
+        flowgate_shabl) -> pandas.Dataframe:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -368,7 +368,7 @@ def criteria6(
         result_data,
         trajectory_shabl,
         flowgate_shabl,
-        faults):
+        faults) -> pandas.Dataframe:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
