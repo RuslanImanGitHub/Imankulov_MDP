@@ -18,3 +18,8 @@ Faults and flowgate should be described in .json file
 Trajectory of regime should be described in .csv file
 
 RastrWin3 templates should be described in RastrWin3 appropriate file formats. They can be found in YOUR_PATH\RastrWin3\RastrWin3\SHABLON
+
+Python packages required:
+  - Pandas
+  - Simple GUI
+  - Numpy
