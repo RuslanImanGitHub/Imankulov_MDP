@@ -1,4 +1,3 @@
-import pandas
 import pandas as pd
 import win32com.client
 
