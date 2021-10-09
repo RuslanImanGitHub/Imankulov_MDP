@@ -194,7 +194,7 @@ def criteria3_8percent_fault(
         position_of_flowgate: [int],
         trajectory_shabl: [str],
         flowgate_shabl: [str],
-        faults: [pandas.DataFrame]) -> dict:
+        faults: [pd.DataFrame]) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -242,7 +242,7 @@ def criteria4_voltage_fault(
         position_of_flowgate: [int],
         trajectory_shabl: [str],
         flowgate_shabl: [str],
-        faults: [pandas.DataFrame]) -> dict:
+        faults: [pd.DataFrame]) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -330,7 +330,7 @@ def criteria6_current_fault(
         position_of_flowgate: [int],
         trajectory_shabl: [str],
         flowgate_shabl: [str],
-        faults: [pandas.DataFrame]) -> dict:
+        faults: [pd.DataFrame]) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
