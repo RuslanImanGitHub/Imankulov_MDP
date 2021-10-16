@@ -1,12 +1,10 @@
-import pandas
 import pandas as pd
 import win32com.client
-
 
 rastr = win32com.client.Dispatch('Astra.Rastr')
 
 
-def trajectory_loading(trajectory_file: [str], trajectory_shabl: [str]) -> None:
+def trajectory_loading(trajectory_file: str, trajectory_shabl: str) -> None:
     """
     считывает файл траектории из формата .csv
     преобразовывает его к виду, в котором
@@ -43,6 +41,7 @@ def trajectory_loading(trajectory_file: [str], trajectory_shabl: [str]) -> None:
                                    left_on='node', right_on='node', how='outer')
     finished_trajectory = finished_trajectory.fillna(0)
     # Загрузка траектории в Растр итерациями
+
     for index, row in finished_trajectory.iterrows():
         rastr.Tables('ut_node').AddRow()
         rastr.Tables('ut_node').Cols('ny').SetZ(index, row['node'])
@@ -56,7 +55,7 @@ def trajectory_loading(trajectory_file: [str], trajectory_shabl: [str]) -> None:
     rastr.Save('Trajectory.ut2', trajectory_shabl)
 
 
-def flowgate_loading(flowgate_file: [str], flowgate_shabl: [str]) -> None:
+def flowgate_loading(flowgate_file: str, flowgate_shabl: str) -> None:
     """
     считывает файл с сечением из формата .json
     с использованием pandas.dataframe
@@ -83,7 +82,7 @@ def flowgate_loading(flowgate_file: [str], flowgate_shabl: [str]) -> None:
     rastr.Save('Flowgate.sch', flowgate_shabl)
 
 
-def faults_loading(faults_file: [str]) -> pandas.DataFrame:
+def faults_loading(faults_file: str) -> pd.DataFrame:
     """
     считывает файл с авариями в формате .json
     и загружает их в pandas.dataframe
@@ -94,7 +93,7 @@ def faults_loading(faults_file: [str]) -> pandas.DataFrame:
     return fault
 
 
-def loading_regime(reg: [str], reg_shab: [str], trajectory_shabl: [str], flowgate_shabl: [str]) -> None:
+def loading_regime(reg: str, reg_shab: str, trajectory_shabl: str, flowgate_shabl: str) -> None:
     """
     загружает файлы режима, траектории и сечения
     и увеличивает предельное число шагов утяжеления до 200
@@ -122,6 +121,7 @@ def ut_control(v: [int], i: [int], p: [int]) -> None:
     """
     включает контроль параметров для утяжеления и
     позволяет ввыбрать какие параметры контролировать для утяжеления
+    По умолчанию все параметры равны 1
     0 - параметр включен
     1 - параметр отключен
     :param v: контроль напряжения при утяжелении
@@ -134,12 +134,24 @@ def ut_control(v: [int], i: [int], p: [int]) -> None:
     rastr.Tables('ut_common').Cols('dis_p_contr').SetZ(0, p)
 
 
+def swap_currents() -> None:
+    """
+    Осуществляет перестановку параметоров ДДТН и АДТН
+    и выделение линий для контроля в них тока
+    """
+    for i in range(0, rastr.Tables('vetv').Size):
+        rastr.Tables('vetv').Cols('i_dop').SetZ(
+            i, rastr.Tables('vetv').Cols('i_dop_r').Z(i))
+        if rastr.Tables('vetv').Cols('i_dop').Z(i) != 0:
+            rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
+
+
 def criteria1_20percent_nofault(
-        reg: [str],
-        reg_shab: [str],
+        reg: str,
+        reg_shab: str,
         position_of_flowgate: [int],
-        trajectory_shabl: [str],
-        flowgate_shabl: [str]) -> dict:
+        trajectory_shabl: str,
+        flowgate_shabl: str) -> dict:
     """
     осуществляет расчет МДП по первому критерию
     :param reg: путь к файлу режима
@@ -161,11 +173,11 @@ def criteria1_20percent_nofault(
 
 
 def criteria2_voltage_nofault(
-        reg: [str],
-        reg_shab: [str],
+        reg: str,
+        reg_shab: str,
         position_of_flowgate: [int],
-        trajectory_shabl: [str],
-        flowgate_shabl: [str]) -> dict:
+        trajectory_shabl: str,
+        flowgate_shabl: str) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -178,7 +190,7 @@ def criteria2_voltage_nofault(
     # Коэффициент запаса по напряжению в узлах нагрузки в нормальной схеме
     loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     # Включим контроль по напряжению и отключим по всем остальным критериям
-    ut_control(0, 1, 1)
+    ut_control(v=0, i=1, p=1)
     ut()
 
     p_limit_2 = rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate)
@@ -190,12 +202,12 @@ def criteria2_voltage_nofault(
 
 
 def criteria3_8percent_fault(
-        reg: [str],
-        reg_shab: [str],
+        reg: str,
+        reg_shab: str,
         position_of_flowgate: [int],
-        trajectory_shabl: [str],
-        flowgate_shabl: [str],
-        faults: [pandas.DataFrame]) -> dict:
+        trajectory_shabl: str,
+        flowgate_shabl: str,
+        faults: [pd.DataFrame]) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -238,12 +250,12 @@ def criteria3_8percent_fault(
 
 
 def criteria4_voltage_fault(
-        reg: [str],
-        reg_shab: [str],
+        reg: str,
+        reg_shab: str,
         position_of_flowgate: [int],
-        trajectory_shabl: [str],
-        flowgate_shabl: [str],
-        faults: [pandas.DataFrame]) -> dict:
+        trajectory_shabl: str,
+        flowgate_shabl: str,
+        faults: [pd.DataFrame]) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -262,7 +274,7 @@ def criteria4_voltage_fault(
         rastr.Load(1, reg, reg_shab)
         # Включим контроль по напряжению и отключим по всем остальным
         # критериям
-        ut_control(0, 1, 1)
+        ut_control(v=0, i=1, p=1)
         vetv = rastr.Tables('vetv')
         vetv.SetSel(
             'ip={}&iq={}&np={}'.format(row['ip'], row['iq'], row['np']))
@@ -286,11 +298,11 @@ def criteria4_voltage_fault(
 
 
 def criteria5_current_nofault(
-        reg: [str],
-        reg_shab: [str],
+        reg: str,
+        reg_shab: str,
         position_of_flowgate: [int],
-        trajectory_shabl: [str],
-        flowgate_shabl: [str]) -> dict:
+        trajectory_shabl: str,
+        flowgate_shabl: str) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -303,16 +315,10 @@ def criteria5_current_nofault(
     # Допустимая токовая нагрузка в нормальной
     loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     # Включим контроль по току и отключим по всем остальным критериям
-    ut_control(1, 0, 1)
+    ut_control(v=1, i=0, p=1)
     # Поместим значения тока оборудования в нужный столбец и отметим все ветви
     # для контроля напряжения
-    i = 0
-    while i < rastr.Tables('vetv').Size:
-        rastr.Tables('vetv').Cols('i_dop').SetZ(
-            i, rastr.Tables('vetv').Cols('i_dop_r').Z(i))
-        if rastr.Tables('vetv').Cols('i_dop').Z(i) != 0:
-            rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
-        i += 1
+    swap_currents()
     rastr.rgm('p')
     ut()
 
@@ -326,12 +332,12 @@ def criteria5_current_nofault(
 
 
 def criteria6_current_fault(
-        reg: [str],
-        reg_shab: [str],
+        reg: str,
+        reg_shab: str,
         position_of_flowgate: [int],
-        trajectory_shabl: [str],
-        flowgate_shabl: [str],
-        faults: [pandas.DataFrame]) -> dict:
+        trajectory_shabl: str,
+        flowgate_shabl: str,
+        faults: [pd.DataFrame]) -> dict:
     """
     осуществляет расчет МДП по второму критерию
     :param reg: путь к файлу режима
@@ -350,7 +356,7 @@ def criteria6_current_fault(
         rastr.Load(1, reg, reg_shab)
         # Включим контроль по току и отключим по всем остальным
         # критериям
-        ut_control(1, 0, 1)
+        ut_control(v=1, i=0, p=1)
         vetv = rastr.Tables('vetv')
         vetv.SetSel(
             'ip={}&iq={}&np={}'.format(row['ip'], row['iq'], row['np']))
@@ -358,13 +364,7 @@ def criteria6_current_fault(
         rastr.rgm('p')
         # Поместим значения тока оборудования в нужный столбец и
         # отметим все ветви для контроля напряжения
-        i = 0
-        while i < rastr.Tables('vetv').Size:
-            rastr.Tables('vetv').Cols('i_dop').SetZ(
-                i, rastr.Tables('vetv').Cols('i_dop_r').Z(i))
-            if rastr.Tables('vetv').Cols('i_dop').Z(i) != 0:
-                rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
-            i += 1
+        swap_currents()
         rastr.rgm('p')
         ut()
         p_limit_6 = rastr.Tables('sechen').Cols(
