@@ -19,38 +19,16 @@ def trajectory_loading(trajectory_file: str, trajectory_shabl: str) -> None:
     rastr.Save('Trajectory.ut2', trajectory_shabl)
     rastr.Load(1, 'Trajectory.ut2', trajectory_shabl)
     trajectory = pd.read_csv(trajectory_file)
-    # Выделение траектории для нагрузки
-    load_trajectory = trajectory[trajectory['variable'] == 'pn']
-    load_trajectory = load_trajectory.rename(
-        columns={
-            'variable': 'pn',
-            'value': 'pn_value',
-            'tg': 'pn_tg'})
-    # LoadTrajectory.to_csv('LoadTrajectory.csv', index=False)
-    # Выделение траектории для генерации
-    gen_trajectory = trajectory[trajectory['variable'] == 'pg']
-    gen_trajectory = gen_trajectory.rename(
-        columns={
-            'variable': 'pg',
-            'value': 'pg_value',
-            'tg': 'pg_tg'})
-    # GenTrajectory.to_csv('GenTrajectory.csv', index=False)
-    # Создаем единый датарейм для исключения ошибок повторения узлов в
-    # траектории утяжеления
-    finished_trajectory = pd.merge(left=gen_trajectory, right=load_trajectory,
-                                   left_on='node', right_on='node', how='outer')
-    finished_trajectory = finished_trajectory.fillna(0)
     # Загрузка траектории в Растр итерациями
-
-    for index, row in finished_trajectory.iterrows():
+    for index, row in trajectory.iterrows():
         rastr.Tables('ut_node').AddRow()
         rastr.Tables('ut_node').Cols('ny').SetZ(index, row['node'])
-        if pd.notnull(row['pg']):
-            rastr.Tables('ut_node').Cols('pg').SetZ(index, row['pg_value'])
-            rastr.Tables('ut_node').Cols('tg').SetZ(index, row['pg_tg'])
-            if pd.notnull(row['pn']):
-                rastr.Tables('ut_node').Cols('pn').SetZ(index, row['pn_value'])
-                rastr.Tables('ut_node').Cols('tg').SetZ(index, row['pn_tg'])
+        if row['variable'] == 'pg':
+            rastr.Tables('ut_node').Cols('pg').SetZ(index, row['value'])
+            rastr.Tables('ut_node').Cols('tg').SetZ(index, row['tg'])
+        if row['variable'] == 'pn':
+            rastr.Tables('ut_node').Cols('pn').SetZ(index, row['value'])
+            rastr.Tables('ut_node').Cols('tg').SetZ(index, row['tg'])
     # Код для проверки заполнения таблицы
     rastr.Save('Trajectory.ut2', trajectory_shabl)
 
@@ -65,18 +43,16 @@ def flowgate_loading(flowgate_file: str, flowgate_shabl: str) -> None:
     """
     # Загрузка сечения
     flowgate = pd.read_json(flowgate_file, orient="index")
-
+    flowgate = flowgate.reset_index(drop=True)
     rastr.Save('Flowgate.sch', flowgate_shabl)
     rastr.Load(1, 'Flowgate.sch', flowgate_shabl)
     rastr.Tables('sechen').AddRow()
     rastr.Tables('sechen').Cols('ns').SetZ(0, 1)
-    i = 0
     for index, row in flowgate.iterrows():
         rastr.Tables('grline').AddRow()
-        rastr.Tables('grline').Cols('ns').SetZ(i, 1)
-        rastr.Tables('grline').Cols('ip').SetZ(i, row['ip'])
-        rastr.Tables('grline').Cols('iq').SetZ(i, row['iq'])
-        i += 1
+        rastr.Tables('grline').Cols('ns').SetZ(index, 1)
+        rastr.Tables('grline').Cols('ip').SetZ(index, row['ip'])
+        rastr.Tables('grline').Cols('iq').SetZ(index, row['iq'])
 
     # Код для проверки заполнения таблицы
     rastr.Save('Flowgate.sch', flowgate_shabl)
@@ -117,7 +93,7 @@ def ut() -> None:
         rastr.ut_utr('')
 
 
-def ut_control(v: [int], i: [int], p: [int]) -> None:
+def ut_control(v: int, i: int, p: int) -> None:
     """
     включает контроль параметров для утяжеления и
     позволяет ввыбрать какие параметры контролировать для утяжеления
@@ -149,7 +125,7 @@ def swap_currents() -> None:
 def criteria1_20percent_nofault(
         reg: str,
         reg_shab: str,
-        position_of_flowgate: [int],
+        position_of_flowgate: int,
         trajectory_shabl: str,
         flowgate_shabl: str) -> dict:
     """
@@ -175,7 +151,7 @@ def criteria1_20percent_nofault(
 def criteria2_voltage_nofault(
         reg: str,
         reg_shab: str,
-        position_of_flowgate: [int],
+        position_of_flowgate: int,
         trajectory_shabl: str,
         flowgate_shabl: str) -> dict:
     """
@@ -204,7 +180,7 @@ def criteria2_voltage_nofault(
 def criteria3_8percent_fault(
         reg: str,
         reg_shab: str,
-        position_of_flowgate: [int],
+        position_of_flowgate: int,
         trajectory_shabl: str,
         flowgate_shabl: str,
         faults: [pd.DataFrame]) -> dict:
@@ -252,7 +228,7 @@ def criteria3_8percent_fault(
 def criteria4_voltage_fault(
         reg: str,
         reg_shab: str,
-        position_of_flowgate: [int],
+        position_of_flowgate: int,
         trajectory_shabl: str,
         flowgate_shabl: str,
         faults: [pd.DataFrame]) -> dict:
@@ -300,7 +276,7 @@ def criteria4_voltage_fault(
 def criteria5_current_nofault(
         reg: str,
         reg_shab: str,
-        position_of_flowgate: [int],
+        position_of_flowgate: int,
         trajectory_shabl: str,
         flowgate_shabl: str) -> dict:
     """
@@ -334,7 +310,7 @@ def criteria5_current_nofault(
 def criteria6_current_fault(
         reg: str,
         reg_shab: str,
-        position_of_flowgate: [int],
+        position_of_flowgate: int,
         trajectory_shabl: str,
         flowgate_shabl: str,
         faults: [pd.DataFrame]) -> dict:
