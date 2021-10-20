@@ -5,13 +5,13 @@ import functions
 
 rastr = win32com.client.Dispatch('Astra.Rastr')
 
-reg_shab = "resources/режим.rg2"
-reg = "resources/regimeMDP.rg2"
-sech_shab = "resources/сечения.sch"
-sech = "resources/flowgate.json"
-fault = "resources/faults.json"
-traject = "resources/vector.csv"
-traject_shab = "resources/траектория утяжеления.ut2"
+reg_shab = "resources//режим.rg2"
+reg = "resources//regimeMDP.rg2"
+sech_shab = "resources//сечения.sch"
+sech = "resources//flowgate.json"
+fault = "resources//faults.json"
+traject = "resources//vector.csv"
+traject_shab = "resources//траектория утяжеления.ut2"
 
 functions.trajectory_loading(traject, traject_shab)
 functions.flowgate_loading(sech, sech_shab)

@@ -1,35 +1,74 @@
 import pandas as pd
 import win32com.client
+import csv
 
 rastr = win32com.client.Dispatch('Astra.Rastr')
 
 
-def trajectory_loading(trajectory_file: str, trajectory_shabl: str) -> None:
+def csv_to_list_of_dicts(path: str) -> [dict]:
+    """
+    записывает файл csv в список словарей
+    :param path: пусть к файлу с траектрией утяжеления
+    :return list_of_nodes_dict: траекторию утяжеления
+    """
+    list_of_nodes_dict = []
+    with open(path, newline='') as csv_data:
+        nodes_dict = csv.DictReader(csv_data)
+        # Creating empty list and adding dictionaries (rows)
+        for row in nodes_dict:
+            list_of_nodes_dict.append(row)
+    return list_of_nodes_dict
+
+
+def add_entry_in_traject(node_number: int, tg_flag: int) -> int:
+    """ 
+    создает ряд в таблице утяжеления и выставляет в ряду номер узла и tg
+    :param node_number: номер узла
+    :param tg_flag: учет тангенса tg
+    :return index: номер строки в таблице утяжеления
+    """
+    index = rastr.Tables('ut_node').size
+    rastr.Tables('ut_node').AddRow()
+    rastr.Tables('ut_node').Cols('ny').SetZ(index, node_number)
+    rastr.Tables('ut_node').Cols('tg').SetZ(index, tg_flag)
+    return index
+
+
+def set_node_tr_param(node_number: int,
+                      param: str,
+                      value: float) -> None:
+    """ 
+    заполнение таблицы траетории утяжеления
+    :param node_number - параметр узла
+    :param param: Параметр утяжеления pg/pn
+    :param value: Приращение pg/pn
+    """
+    rastr.Tables('ut_node').Cols(param).SetZ(node_number, value)
+
+
+def trajectory_loading(trajectory_file, trajectory_shabl: str) -> None:
     """
     считывает файл траектории из формата .csv
     преобразовывает его к виду, в котором
     данная таблица находится в rastrwin3
-    с использованием pandas.dataframe
     и загружает траекторию утяжеления в rastrwin3
     :param trajectory_file: путь к файлу траекории в формате .csv
     :param trajectory_shabl: путь к файлу шаблона траектории rastrwin3
     """
-    # Загрузка траектории утяжеления
-    # Подготовка данных к загрузке в Растр
     rastr.Save('Trajectory.ut2', trajectory_shabl)
     rastr.Load(1, 'Trajectory.ut2', trajectory_shabl)
-    trajectory = pd.read_csv(trajectory_file)
-    # Загрузка траектории в Растр итерациями
-    for index, row in trajectory.iterrows():
-        rastr.Tables('ut_node').AddRow()
-        rastr.Tables('ut_node').Cols('ny').SetZ(index, row['node'])
-        if row['variable'] == 'pg':
-            rastr.Tables('ut_node').Cols('pg').SetZ(index, row['value'])
-            rastr.Tables('ut_node').Cols('tg').SetZ(index, row['tg'])
-        if row['variable'] == 'pn':
-            rastr.Tables('ut_node').Cols('pn').SetZ(index, row['value'])
-            rastr.Tables('ut_node').Cols('tg').SetZ(index, row['tg'])
-    # Код для проверки заполнения таблицы
+    list_of_dicts = csv_to_list_of_dicts(trajectory_file)
+    present_entries = {}
+    for row in list_of_dicts:
+        node = row.get('node', 0)
+        if node not in present_entries:
+            node_number = add_entry_in_traject(node, row.get('tg', 0))
+            present_entries[node] = node_number
+        else:
+            node_number = present_entries[node]
+        variable = row.get('variable', 'pn')
+        set_node_tr_param(
+            node_number, variable, float(row.get('value', 0)))
     rastr.Save('Trajectory.ut2', trajectory_shabl)
 
 
@@ -69,7 +108,10 @@ def faults_loading(faults_file: str) -> pd.DataFrame:
     return fault
 
 
-def loading_regime(reg: str, reg_shab: str, trajectory_shabl: str, flowgate_shabl: str) -> None:
+def loading_regime(reg: str,
+                   reg_shab: str,
+                   trajectory_shabl: str,
+                   flowgate_shabl: str) -> None:
     """
     загружает файлы режима, траектории и сечения
     и увеличивает предельное число шагов утяжеления до 200
@@ -110,16 +152,27 @@ def ut_control(v: int, i: int, p: int) -> None:
     rastr.Tables('ut_common').Cols('dis_p_contr').SetZ(0, p)
 
 
-def swap_currents() -> None:
+def ddtn_or_adtn_current_control(flag: bool) -> None:
     """
     Осуществляет перестановку параметоров ДДТН и АДТН
     и выделение линий для контроля в них тока
+    Параметр flag:
+    False - доаварийный режим (контроль ДДТН)
+    True - аварийный режим (контроль АДТН)
+    :param flag
     """
-    for i in range(0, rastr.Tables('vetv').Size):
-        rastr.Tables('vetv').Cols('i_dop').SetZ(
-            i, rastr.Tables('vetv').Cols('i_dop_r').Z(i))
-        if rastr.Tables('vetv').Cols('i_dop').Z(i) != 0:
-            rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
+    if flag is False:
+        for i in range(0, rastr.Tables('vetv').Size):
+            rastr.Tables('vetv').Cols('i_dop').SetZ(
+                i, rastr.Tables('vetv').Cols('i_dop_r').Z(i))
+            if rastr.Tables('vetv').Cols('i_dop').Z(i) != 0:
+                rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
+    else:
+        for i in range(0, rastr.Tables('vetv').Size):
+            rastr.Tables('vetv').Cols('i_dop').SetZ(
+                i, rastr.Tables('vetv').Cols('i_dop_r_av').Z(i))
+            if rastr.Tables('vetv').Cols('i_dop').Z(i) != 0:
+                rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
 
 
 def set_voltage(voltage: float) -> None:
@@ -175,7 +228,7 @@ def criteria2_voltage_nofault(
     loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     # Включим контроль по напряжению и отключим по всем остальным критериям
     ut_control(v=0, i=1, p=1)
-    set_voltage(voltage=0.7/(1-0.15))
+    # set_voltage(voltage=0.7/(1-0.15))
     ut()
 
     p_limit_2 = rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate)
@@ -205,29 +258,29 @@ def criteria3_8percent_fault(
     # Расчет МДП по критерию 3
     # Коэффициент запаса статичекой апериодической устойчивости в
     # послеаварийном режиме
-    loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     prelim_data_3 = pd.DataFrame(columns=['Fault-node_index', 'MDP'])
 
     for index, row in faults.iterrows():
-        rastr.Load(1, reg, reg_shab)
+        loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
         vetv = rastr.Tables('vetv')
-        vetv.SetSel(
-            'ip={}&iq={}&np={}'.format(row['ip'], row['iq'], row['np']))
+        vetv.SetSel(f'ip={row["ip"]}&iq={ row["iq"]}&np={row["np"]}')
         vetv.Cols('sta').Calc(str(row['sta']))
         rastr.rgm('p')
         ut()
         # Расчитаем переток в послеваварийном режиме с запасом в 8%
-        mdp_p_av = rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate)
+        mdp_p_av = abs(rastr.Tables('sechen').Cols('psech')
+                       .Z(position_of_flowgate))
         mdp_8_persent = mdp_p_av * 0.92
         # Получим число шагов утяжеления, за которые переток достиг предела
         steps = rastr.GetToggle()
         # Выставим шаг, при котором переток равен перетоку в
         # послеваварийном режиме с запасом в 8%
-        i = 0
+        j = 0
         while mdp_p_av > mdp_8_persent:
-            steps.MoveOnPosition(len(steps.GetPositions()) - i)
-            mdp_p_av = abs(rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate))
-            i += 1
+            steps.MoveOnPosition(len(steps.GetPositions()) - j)
+            mdp_p_av = abs(rastr.Tables('sechen').Cols('psech')
+                           .Z(position_of_flowgate))
+            j += 1
         # Включаем ветвь и смотрим переток в доаварийном режиме
         vetv.Cols('sta').Calc(not row['sta'])
         rastr.rgm('p')
@@ -264,20 +317,18 @@ def criteria4_voltage_fault(
     """
     # Расчет МДП по критерию 4
     # Коэффициент запаса по напряжению в узлах нагрузки в послеаварийном режиме
-    loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     prelim_data_4 = pd.DataFrame(columns=['Fault-node_index', 'MDP'])
 
     for index, row in faults.iterrows():
-        rastr.Load(1, reg, reg_shab)
+        loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
         # Включим контроль по напряжению и отключим по всем остальным
         # критериям
         ut_control(v=0, i=1, p=1)
         vetv = rastr.Tables('vetv')
-        vetv.SetSel(
-            'ip={}&iq={}&np={}'.format(row['ip'], row['iq'], row['np']))
+        vetv.SetSel(f'ip={row["ip"]}&iq={ row["iq"]}&np={row["np"]}')
         vetv.Cols('sta').Calc(str(row['sta']))
         rastr.rgm('p')
-        set_voltage(voltage=0.7 / (1 - 0.1))
+        # set_voltage(voltage=0.7 / (1 - 0.1))
         ut()
 
         p_limit_4_prelim = rastr.Tables('sechen').Cols(
@@ -316,7 +367,7 @@ def criteria5_current_nofault(
     ut_control(v=1, i=0, p=1)
     # Поместим значения тока оборудования в нужный столбец и отметим все ветви
     # для контроля напряжения
-    swap_currents()
+    ddtn_or_adtn_current_control(False)
     rastr.rgm('p')
     ut()
 
@@ -347,24 +398,23 @@ def criteria6_current_fault(
     """
     # Расчет МДП по критерию 6
     # Допустимая токовая нагрузка в послеаварийной схеме
-    loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     prelim_data_6 = pd.DataFrame(columns=['line_index', 'MDP'])
 
     for index, row in faults.iterrows():
-        rastr.Load(1, reg, reg_shab)
+        loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
         # Включим контроль по току и отключим по всем остальным
         # критериям
         ut_control(v=1, i=0, p=1)
         vetv = rastr.Tables('vetv')
-        vetv.SetSel(
-            'ip={}&iq={}&np={}'.format(row['ip'], row['iq'], row['np']))
-        vetv.Cols('sta').Calc(str(row['sta']))
+        vetv.SetSel(f'ip={row["ip"]}&iq={ row["iq"]}&np={row["np"]}')
+        vetv.Cols('sta').Calc(row['sta'])
         rastr.rgm('p')
         # Поместим значения тока оборудования в нужный столбец и
         # отметим все ветви для контроля напряжения
-        swap_currents()
+        ddtn_or_adtn_current_control(True)
         rastr.rgm('p')
         ut()
+
         p_limit_6 = rastr.Tables('sechen').Cols(
             'psech').Z(position_of_flowgate)
         prelim_criteria_6 = {'line_index': 1, 'MDP': p_limit_6}
