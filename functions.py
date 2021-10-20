@@ -122,6 +122,14 @@ def swap_currents() -> None:
             rastr.Tables('vetv').Cols('contr_i').SetZ(i, 1)
 
 
+def set_voltage(voltage: float) -> None:
+    """
+    Осуществляет настройку минимального напряжения для утяжеления
+    :param voltage: запас по напряжению
+    """
+    rastr.Tables('com_regim').Cols('dv_min').SetZ(0, float(voltage))
+
+
 def criteria1_20percent_nofault(
         reg: str,
         reg_shab: str,
@@ -167,6 +175,7 @@ def criteria2_voltage_nofault(
     loading_regime(reg, reg_shab, trajectory_shabl, flowgate_shabl)
     # Включим контроль по напряжению и отключим по всем остальным критериям
     ut_control(v=0, i=1, p=1)
+    set_voltage(voltage=0.7/(1-0.15))
     ut()
 
     p_limit_2 = rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate)
@@ -207,12 +216,24 @@ def criteria3_8percent_fault(
         vetv.Cols('sta').Calc(str(row['sta']))
         rastr.rgm('p')
         ut()
-
+        # Расчитаем переток в послеваварийном режиме с запасом в 8%
+        mdp_p_av = rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate)
+        mdp_8_persent = mdp_p_av * 0.92
+        # Получим число шагов утяжеления, за которые переток достиг предела
+        steps = rastr.GetToggle()
+        # Выставим шаг, при котором переток равен перетоку в
+        # послеваварийном режиме с запасом в 8%
+        i = 0
+        while mdp_p_av > mdp_8_persent:
+            steps.MoveOnPosition(len(steps.GetPositions()) - i)
+            mdp_p_av = abs(rastr.Tables('sechen').Cols('psech').Z(position_of_flowgate))
+            i += 1
+        # Включаем ветвь и смотрим переток в доаварийном режиме
         vetv.Cols('sta').Calc(not row['sta'])
         rastr.rgm('p')
         p_limit_3_prelim = rastr.Tables('sechen').Cols(
             'psech').Z(position_of_flowgate)
-        mdp_3_prelim = abs(p_limit_3_prelim) * 0.92 - 30
+        mdp_3_prelim = abs(p_limit_3_prelim) - 30
         prelim_criteria_3 = {
             'Fault-node_index': 1, 'MDP': mdp_3_prelim}
         prelim_data_3 = prelim_data_3.append(
@@ -256,6 +277,7 @@ def criteria4_voltage_fault(
             'ip={}&iq={}&np={}'.format(row['ip'], row['iq'], row['np']))
         vetv.Cols('sta').Calc(str(row['sta']))
         rastr.rgm('p')
+        set_voltage(voltage=0.7 / (1 - 0.1))
         ut()
 
         p_limit_4_prelim = rastr.Tables('sechen').Cols(
